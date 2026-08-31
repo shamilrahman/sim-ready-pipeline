@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sim Ready — Digital Twin Asset Creation</title>
+<style>
+/* ============================================================
+   TYPE SYSTEM
+   Primary   — Poppins 400/500, all explicit UI (labels, headings,
+               panel titles, nav, buttons)
+   Secondary — IBM Plex Sans 400/500, body / cascade base
+   Nothing above weight 500 anywhere.
+   ============================================================ */
+@font-face{
+  font-family:'Poppins'; font-style:normal; font-weight:400; font-display:swap;
+  src:url('media/fonts/Poppins-400.woff2') format('woff2');
+}
+@font-face{
+  font-family:'Poppins'; font-style:normal; font-weight:500; font-display:swap;
+  src:url('media/fonts/Poppins-500.woff2') format('woff2');
+}
+/* IBM Plex Sans ships from Google as a variable font — one file, 100-700 axis */
+@font-face{
+  font-family:'IBM Plex Sans'; font-style:normal; font-weight:100 700;
+  font-stretch:100%; font-display:swap;
+  src:url('media/fonts/IBMPlexSans-var.woff2') format('woff2');
+}
+
+:root{
+  --ink:        #08080a;
+  --paper:      #d4cec3;
+  --paper-dim:  #9a9288;
+  --paper-faint:#6d665d;
+  --vermilion:  #c0472d;
+  --vermilion-l:#e0664a;
+  --rule:       rgba(212,206,195,.14);
+  /* caption block fill — 85%, so the render reads faintly through it */
+  --card:       rgba(8,8,10,.85);
+
+  --ui:   'Poppins', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --body: 'IBM Plex Sans', 'Segoe UI', system-ui, -apple-system, sans-serif;
+
+  /* one step smaller than default throughout */
+  --fs-title: 14px;   /* titles, wordmark            */
+  --fs-head:  12px;   /* section heads               */
+  --fs-label: 11px;   /* labels                      */
+  --fs-sub:   10.5px; /* sub-labels, spec values     */
+  --fs-small: 10px;   /* small text, eyebrows        */
+  --fs-tiny:  9px;    /* badges, spec keys, ticks    */
+
+  /* display sizes for the narrative headings (see note in handover) */
+  --fs-h1: clamp(23px, 2.5vw, 34px);
+  --fs-h2: clamp(19px, 2vw, 26px);
+
+  --gutter: clamp(1.25rem, 4.5vw, 5rem);
+  --banner-h: 3.6rem;
+
+  /* the caption block, and the text column inside it. Everything the
+     reader sees is anchored left and capped at --panel-w. */
+  --band:    clamp(320px, 42vw, 580px);
+  --panel-w: calc(var(--band) - var(--gutter) * 2);
+}
+
+*,*::before,*::after{ box-sizing:border-box; }
+
+body{
+  margin:0;
+  background:var(--ink);
+  color:var(--paper);
+  font-family:var(--body);
+  font-size:var(--fs-title);
+  font-weight:400;
+  line-height:1.7;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+
+/* nothing heavier than medium, anywhere */
+b, strong{ font-weight:500; }
+
+/* ============================================================
+   FIXED VIDEO STAGE — no filter, no scrim
+   ============================================================ */
+.stage{ position:fixed; inset:0; z-index:0; background:var(--ink); overflow:hidden; }
+/* plain cover fit */
+.stage video{
+  position:absolute; inset:0;
+  width:100%; height:100%;
+  object-fit:cover;
+  transform:scale(1.02);
+}
+
+/* ---- caption block: fixed, left, full height, opaque ---- */
+.band{
+  position:fixed; top:0; bottom:0; left:0;
+  width:var(--band);
+  z-index:2;
+  pointer-events:none;
+  background:var(--card);
+}
+.band i{
+  position:absolute; top:0; bottom:0; right:0; width:1px;
+  background:rgba(212,206,195,.18);
+}
+
+/* film grain */
+.grain{
+  position:fixed; inset:-50%; z-index:3;
+  pointer-events:none; opacity:.06;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='220' height='220' filter='url(%23n)' opacity='0.55'/></svg>");
+  animation:grain 1.2s steps(3) infinite;
+}
+@keyframes grain{
+  0%,100%{ transform:translate(0,0); }
+  33%    { transform:translate(-2%,1.5%); }
+  66%    { transform:translate(1.5%,-1%); }
+}
+
+/* ============================================================
+   BANNER — static, pinned, sits on the block. Never moves.
+   ============================================================ */
+.banner{
+  position:fixed; top:0; left:0;
+  width:var(--band);
+  min-height:var(--banner-h);
+  z-index:50;
+  display:flex; align-items:center; justify-content:space-between;
+  gap:1rem;
+  padding:.75rem var(--gutter);
+  /* same 85% fill as the block so there's no seam; the blur keeps copy
+     scrolling underneath from reading through */
+  background:var(--card);
+  backdrop-filter:blur(14px);
+  -webkit-backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--rule);
+  font-family:var(--ui);
+}
+.b-id{ display:flex; align-items:center; gap:.6rem; }
+.b-mark{ width:26px; height:26px; flex:none; display:block; }
+.banner b{
+  display:block;
+  font-size:var(--fs-title); font-weight:500;
+  letter-spacing:.01em; color:var(--paper);
+  line-height:1.3;
+}
+.banner .sub{
+  display:block;
+  font-size:var(--fs-tiny); font-weight:400;
+  letter-spacing:.18em; text-transform:uppercase;
+  color:var(--paper-faint);
+}
+.banner .right{ text-align:right; }
+.banner .right #cNum{
+  display:block;
+  font-size:var(--fs-label); font-weight:500;
+  letter-spacing:.1em; color:var(--paper);
+  font-variant-numeric:tabular-nums;
+}
+.banner .right #cName{
+  display:block;
+  font-size:var(--fs-tiny); font-weight:400;
+  letter-spacing:.16em; text-transform:uppercase;
+  color:var(--paper-faint);
+}
+
+/* timeline rail — the only chrome outside the block; hairlines only */
+.rail{
+  position:fixed; right:calc(var(--gutter) * .6); top:50%;
+  transform:translateY(-50%); z-index:40;
+  display:flex; flex-direction:column; gap:.7rem; align-items:flex-end;
+}
+.rail button{
+  appearance:none; border:0; padding:0; background:none; cursor:pointer;
+  display:flex; align-items:center; gap:.55rem;
+  color:var(--paper-faint);
+  font-family:var(--ui); font-size:var(--fs-tiny); font-weight:500;
+  letter-spacing:.14em; text-transform:uppercase;
+  transition:color .35s ease;
+  text-shadow:0 1px 2px rgba(8,8,10,.95), 0 0 12px rgba(8,8,10,.92);
+}
+.rail button i{
+  display:block; width:16px; height:1px; background:currentColor;
+  box-shadow:0 0 6px rgba(8,8,10,.9);
+  transition:width .35s ease, background .35s ease;
+}
+.rail button:hover{ color:var(--paper-dim); }
+.rail button.on{ color:var(--vermilion-l); }
+.rail button.on i{ width:34px; background:var(--vermilion); }
+.rail button span{ opacity:0; transition:opacity .35s ease; }
+.rail button.on span, .rail button:hover span{ opacity:1; }
+
+.scrub{ position:fixed; left:0; bottom:0; height:2px; width:100%; z-index:51; background:rgba(212,206,195,.08); }
+.scrub i{ display:block; height:100%; width:0%; background:var(--vermilion); transition:width .08s linear; }
+
+/* ============================================================
+   CONTENT — every section anchored left, capped at --panel-w
+   ============================================================ */
+.scroll{ position:relative; z-index:10; }
+
+.hero, .outro{
+  min-height:100vh;
+  display:flex; flex-direction:column; justify-content:center;
+  padding:calc(var(--banner-h) + 2rem) var(--gutter) 0;
+}
+/* no max-width/auto-margin here — that centred them away from the
+   block on wide viewports and pushed copy out over the render */
+.hero > *, .outro > *{ max-width:var(--panel-w); }
+
+.hero .eyebrow{
+  font-family:var(--ui);
+  font-size:var(--fs-small); font-weight:500;
+  letter-spacing:.24em; text-transform:uppercase;
+  color:var(--vermilion-l); margin:0 0 1.3rem;
+}
+.hero h1{
+  font-family:var(--ui); font-weight:500;
+  font-size:var(--fs-h1);
+  line-height:1.24; letter-spacing:-.01em;
+  margin:0 0 1.2rem; text-wrap:balance;
+}
+.hero h1 em{ font-style:normal; font-weight:400; color:var(--paper-dim); }
+.hero .lede{
+  font-family:var(--body);
+  font-size:var(--fs-title); font-weight:400;
+  line-height:1.72; color:var(--paper-dim); margin:0 0 2.2rem;
+}
+.hero .lede b{ color:var(--paper); }
+
+.stats{
+  display:grid; grid-template-columns:repeat(2, minmax(0,1fr));
+  gap:1.1rem 1.4rem;
+  padding-top:1.5rem; border-top:1px solid var(--rule);
+  max-width:var(--panel-w);
+}
+.stats div strong{
+  display:block;
+  font-family:var(--ui); font-size:20px; font-weight:500;
+  line-height:1.1; color:var(--paper); font-variant-numeric:tabular-nums;
+}
+.stats div span{
+  display:block; margin-top:.35rem;
+  font-family:var(--ui); font-size:var(--fs-tiny); font-weight:400;
+  letter-spacing:.16em; text-transform:uppercase; color:var(--paper-dim);
+}
+
+.enter{
+  margin-top:auto; padding-bottom:2.2rem;
+  display:flex; align-items:center; gap:.8rem;
+  font-family:var(--ui); font-size:var(--fs-small); font-weight:500;
+  letter-spacing:.22em; text-transform:uppercase; color:var(--paper-faint);
+}
+.enter i{
+  display:block; width:1px; height:30px;
+  background:linear-gradient(to bottom, var(--vermilion), transparent);
+  animation:drop 2.2s ease-in-out infinite;
+}
+@keyframes drop{
+  0%,100%{ transform:scaleY(.4); transform-origin:top; opacity:.4; }
+  50%    { transform:scaleY(1);  transform-origin:top; opacity:1; }
+}
+
+/* --- chapters --- */
+.chapter{
+  min-height:128vh; display:flex; align-items:center;
+  padding:calc(var(--banner-h) + 2.5rem) var(--gutter) 2rem;
+}
+.panel{ max-width:var(--panel-w); will-change:opacity, transform; }
+
+.panel .num{
+  display:flex; align-items:center; gap:.75rem;
+  font-family:var(--ui); font-size:var(--fs-small); font-weight:500;
+  letter-spacing:.2em; text-transform:uppercase;
+  color:var(--vermilion-l); margin:0 0 1.1rem;
+}
+.panel .num s{ flex:0 0 auto; width:34px; height:1px; background:rgba(192,71,45,.55); text-decoration:none; }
+.panel .num em{ font-style:normal; color:var(--paper-faint); }
+
+.panel h2{
+  font-family:var(--ui); font-weight:500;
+  font-size:var(--fs-h2);
+  line-height:1.28; letter-spacing:-.01em;
+  margin:0 0 .6rem; text-wrap:balance;
+}
+.panel .sig{
+  font-family:var(--ui);
+  font-size:var(--fs-sub); font-weight:400;
+  letter-spacing:.05em; color:var(--paper-faint);
+  margin:0 0 1.1rem; padding-bottom:1.1rem;
+  border-bottom:1px solid var(--rule);
+}
+.panel p{
+  font-family:var(--body);
+  font-size:var(--fs-title); font-weight:400;
+  line-height:1.72; color:var(--paper-dim);
+  margin:0 0 .9rem;
+}
+.panel p b{ color:var(--paper); }
+.panel p.pull{
+  color:var(--paper);
+  border-left:2px solid var(--vermilion);
+  padding-left:.95rem;
+}
+
+/* spec table */
+.spec{ margin:1.4rem 0 0; border-top:1px solid var(--rule); }
+.spec div{
+  display:flex; gap:1rem;
+  padding:.5rem 0; border-bottom:1px solid rgba(212,206,195,.08);
+}
+.spec dt{
+  flex:0 0 40%; margin:0;
+  font-family:var(--ui); font-size:var(--fs-tiny); font-weight:500;
+  text-transform:uppercase; letter-spacing:.13em;
+  color:var(--paper-dim); padding-top:.15em;
+}
+.spec dd{
+  flex:1; margin:0;
+  font-family:var(--ui); font-size:var(--fs-sub); font-weight:400;
+  line-height:1.5; color:var(--paper);
+}
+.spec dd em{ font-style:normal; color:var(--paper-faint); }
+
+/* --- outro --- */
+.outro blockquote{
+  margin:0 0 1.4rem;
+  font-family:var(--ui); font-weight:400;
+  font-size:var(--fs-h2); line-height:1.35; letter-spacing:-.005em;
+  color:var(--paper); text-wrap:balance;
+}
+.outro blockquote span{ color:var(--vermilion-l); }
+.outro cite{
+  display:block; margin:0 0 2.4rem;
+  font-family:var(--ui); font-style:normal;
+  font-size:var(--fs-small); font-weight:400;
+  letter-spacing:.14em; text-transform:uppercase; color:var(--paper-faint);
+}
+
+/* --- footer: full-width end card, opaque over the block --- */
+footer{
+  position:relative; z-index:10;
+  background:linear-gradient(to bottom, transparent, var(--ink) 30%);
+  padding:6rem var(--gutter) 2.5rem;
+}
+.foot-grid{
+  display:grid; grid-template-columns:repeat(auto-fit, minmax(170px,1fr)); gap:2.2rem;
+  padding-top:2rem; border-top:1px solid var(--rule);
+}
+.foot-grid h6{
+  margin:0 0 .9rem;
+  font-family:var(--ui); font-size:var(--fs-small); font-weight:500;
+  letter-spacing:.2em; text-transform:uppercase; color:var(--vermilion-l);
+}
+.foot-grid ul{ margin:0; padding:0; list-style:none; }
+.foot-grid li{
+  font-family:var(--ui); font-size:var(--fs-sub); font-weight:400;
+  line-height:2; color:var(--paper-faint);
+}
+.colophon{
+  margin:3rem 0 0;
+  display:flex; justify-content:space-between; flex-wrap:wrap; gap:1rem;
+  font-family:var(--ui); font-size:var(--fs-tiny); font-weight:400;
+  letter-spacing:.14em; text-transform:uppercase; color:var(--paper-faint);
+}
+
+/* ============================================================
+   ASSET FIGURES — the Substance Painter work, inline in the column
+   ============================================================ */
+.asset{
+  margin:1.3rem 0 0;
+  border:1px solid rgba(212,206,195,.16);
+  background:rgba(8,8,10,.55);
+}
+.asset img{ display:block; width:100%; height:auto; }
+.asset figcaption{
+  display:flex; align-items:baseline; gap:.5rem; flex-wrap:wrap;
+  padding:.5rem .6rem .55rem;
+  border-top:1px solid var(--rule);
+}
+.asset .a-stage{
+  font-family:var(--ui); font-size:var(--fs-tiny); font-weight:500;
+  letter-spacing:.14em; text-transform:uppercase; color:var(--vermilion-l);
+}
+.asset .a-title{
+  font-family:var(--ui); font-size:var(--fs-small); font-weight:400;
+  color:var(--paper-dim);
+}
+/* two-up when a chapter carries a pair */
+.asset-pair{ display:grid; grid-template-columns:1fr 1fr; gap:.5rem; margin-top:1.3rem; }
+.asset-pair .asset{ margin:0; }
+.asset-pair figcaption{ padding:.4rem .5rem .45rem; }
+
+/* ============================================================
+   LOADER — the mark builds itself while the film buffers
+   ============================================================ */
+/* matches the chalk tiles, so the loader reads monochrome */
+:root{ --brand:#f4f2f7; }
+
+.loader{
+  position:fixed; inset:0; z-index:200;
+  display:grid; place-items:center;
+  background:var(--ink);
+  transition:opacity .7s ease, visibility .7s ease;
+}
+.loader.done{ opacity:0; visibility:hidden; }
+body.loading{ overflow:hidden; }
+
+.loader-in{
+  display:flex; flex-direction:column; align-items:center;
+  width:min(360px, 78vw);
+}
+#logoCv{ width:200px; height:200px; display:block; }
+
+.l-id{
+  display:flex; align-items:baseline; gap:.5rem;
+  margin-top:1.6rem; font-family:var(--ui);
+}
+.l-id b{
+  font-size:16px; font-weight:500; color:var(--paper); letter-spacing:-.01em;
+}
+.l-id span{
+  font-size:var(--fs-tiny); font-weight:400; letter-spacing:.16em;
+  text-transform:uppercase; color:var(--paper-faint);
+}
+.l-tag{
+  margin-top:.35rem;
+  font-family:var(--ui); font-size:var(--fs-small); font-weight:400;
+  letter-spacing:.2em; text-transform:uppercase; color:var(--paper-dim);
+}
+
+.l-bar{
+  width:100%; height:2px; margin-top:1.8rem;
+  background:rgba(212,206,195,.12);
+}
+.l-bar i{
+  display:block; height:100%; width:0%;
+  background:var(--brand);
+}
+.l-meta{
+  width:100%; display:flex; justify-content:space-between;
+  margin-top:.7rem;
+  font-family:var(--ui); font-size:var(--fs-tiny); font-weight:500;
+  letter-spacing:.16em; text-transform:uppercase; color:var(--paper-faint);
+}
+.l-meta #lPct{ color:var(--paper-dim); font-variant-numeric:tabular-nums; }
+
+/* ============================================================
+   RESPONSIVE / A11Y
+   ============================================================ */
+@media (max-width:900px){
+  :root{ --band:100%; --panel-w:calc(100% - var(--gutter) * 2); }
+  .rail{ display:none; }
+  .chapter{ min-height:106vh; }
+  .banner .right #cName{ display:none; }
+  .band i{ display:none; }
+  .spec div{ flex-direction:column; gap:.2rem; }
+  .spec dt{ flex:none; }
+}
+
+/* laptop heights: the longest chapters (07 Physics, 06 Materials) need
+   this to stay inside the fold */
+@media (max-height:980px){
+  .chapter{ padding-top:calc(var(--banner-h) + 1.5rem); padding-bottom:1.5rem; }
+  .panel p{ line-height:1.6; margin-bottom:.7rem; }
+  .panel .num{ margin-bottom:.85rem; }
+  .panel h2{ margin-bottom:.5rem; }
+  .panel .sig{ margin-bottom:.85rem; padding-bottom:.85rem; }
+  .spec{ margin-top:1.05rem; }
+  .spec div{ padding:.38rem 0; }
+}
+@media (max-height:780px){
+  .panel p{ line-height:1.54; margin-bottom:.6rem; }
+  .spec div{ padding:.3rem 0; }
+}
+
+@media (prefers-reduced-motion:reduce){
+  .grain{ animation:none; }
+  .enter i{ animation:none; }
+  .panel{ opacity:1 !important; transform:none !important; }
+}
+
+:focus-visible{ outline:1px solid var(--vermilion-l); outline-offset:4px; }
+</style>
+<style>
+/* contact link — added at publish time by publish.mjs */
+.colophon-end{ display:flex; align-items:center; gap:1.25rem; flex-wrap:wrap; }
+.colophon-cta{
+  color:var(--vermilion); text-decoration:none;
+  border-bottom:1px solid rgba(192,71,45,.45); padding-bottom:2px;
+  transition:color .2s ease, border-color .2s ease;
+}
+.colophon-cta:hover{ color:var(--vermilion-l); border-color:var(--vermilion-l); }
+</style>
+</head>
+<body>
+
+<div class="loader" id="loader">
+  <div class="loader-in">
+    <canvas id="logoCv" width="200" height="200"></canvas>
+    <div class="l-id"><b>Sim&nbsp;Ready</b><span>by Shamil Rahman</span></div>
+    <div class="l-tag">Digital twin asset pipeline</div>
+    <div class="l-bar"><i id="lBar"></i></div>
+    <div class="l-meta"><span id="lState">Loading</span><span id="lPct">0%</span></div>
+  </div>
+</div>
+
+<div class="stage">
+  <video id="film" src="media/scrub.mp4" poster="media/poster.jpg"
+         muted playsinline preload="auto" disablepictureinpicture></video>
+</div>
+<div class="band" id="band"><i></i></div>
+<div class="grain"></div>
+
+<header class="banner" id="banner">
+  <div class="b-id">
+    <canvas class="b-mark" id="markCv" width="26" height="26" aria-hidden="true"></canvas>
+    <div>
+      <b>Sim&nbsp;Ready</b>
+      <span class="sub">by Shamil Rahman</span>
+    </div>
+  </div>
+  <div class="right">
+    <span id="cNum">00 / 06</span>
+    <span id="cName">Overview</span>
+  </div>
+</header>
+
+<nav class="rail" id="rail" aria-label="Chapters"></nav>
+<div class="scrub"><i id="scrubBar"></i></div>
+
+<main class="scroll">
+
+  <!-- HERO -->
+  <section class="hero" data-chapter="Overview">
+    <p class="eyebrow">Digital Twin Asset Creation</p>
+    <h1>CAD can&rsquo;t be simulated. <em>So I built the pipeline that makes it.</em></h1>
+    <p class="lede">
+      Thirteen stages, four tools, one standard — a documented workflow that takes
+      vendor CAD from the mechanical team to a physics-ready asset in Isaac Sim,
+      and lets a new designer run it in <b>a day instead of a week</b>.
+    </p>
+    <div class="stats">
+      <div><strong>13</strong><span>Stages, each owned</span></div>
+      <div><strong>4</strong><span>Designers running it</span></div>
+      <div><strong>1 day</strong><span>To onboard, was a week</span></div>
+      <div><strong>10&ndash;100&times;</strong><span>Lighter than source CAD</span></div>
+    </div>
+    <div class="enter"><i></i><span>Scroll</span></div>
+  </section>
+
+  <!-- 01 -->
+  <section class="chapter" data-chapter="Problem">
+    <div class="panel">
+      <p class="num"><s></s>01 <em>/ 06</em> &nbsp;The problem</p>
+      <h2>CAD is built to be manufactured, not simulated</h2>
+      <p class="sig">The starting condition</p>
+      <p>
+        Vendor CAD arrives with every fastener and weld nut modelled, and none of
+        what a simulator needs — no UVs, no collision, no mass, no usable hierarchy.
+        <b>Millions of triangles that will never run at rate.</b> Every project
+        started here.
+      </p>
+      <dl class="spec">
+        <div><dt>Arrives as</dt><dd>JT &middot; STEP &middot; native</dd></div>
+        <div><dt>Raw density</dt><dd>8&ndash;40M tri per module</dd></div>
+        <div><dt>Missing</dt><dd>UVs, collision, physics, semantics</dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <!-- 02 -->
+  <section class="chapter" data-chapter="System">
+    <div class="panel">
+      <p class="num"><s></s>02 <em>/ 06</em> &nbsp;The system</p>
+      <h2>Thirteen stages, each with a defined input and output</h2>
+      <p class="sig">The pipeline</p>
+      <p>
+        I broke the work into thirteen stages, each with an owner and acceptance
+        criteria. The output of one is the input of the next, and a stage that fails
+        sends the asset <b>back rather than forward</b> — which is why nothing
+        reaches a scene half-built.
+      </p>
+      <figure class="asset">
+        <img src="media/assets/roller-hero.jpg" alt="Driven roller conveyor, textured in Substance Painter">
+        <figcaption>
+          <span class="a-stage">Stage 05 &middot; Retopology</span>
+          <span class="a-title">Driven roller conveyor</span>
+        </figcaption>
+      </figure>
+      <dl class="spec">
+        <div><dt>Stages</dt><dd>13, input and output defined</dd></div>
+        <div><dt>Tools</dt><dd>Isaac Sim, Blender, Painter, Nucleus</dd></div>
+        <div><dt>Tracked in</dt><dd>One master sheet of unique assets</dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <!-- 03 -->
+  <section class="chapter" data-chapter="Decisions">
+    <div class="panel">
+      <p class="num"><s></s>03 <em>/ 06</em> &nbsp;Decisions</p>
+      <h2>The calls that stopped the rework</h2>
+      <p class="sig">Where the judgement sits</p>
+      <p>
+        A 50 mm cleanup threshold with two inverse scripts, because deleting ten
+        thousand objects freezes Blender for an hour. Rebuild rather than decimate,
+        because CAD topology can&rsquo;t be textured. <b>Both came from hitting the
+        wall first.</b>
+      </p>
+      <div class="asset-pair">
+        <figure class="asset">
+          <img src="media/assets/roller-closeup.jpg" alt="Roller bed rebuilt with clean topology">
+          <figcaption>
+            <span class="a-stage">Stage 07</span><span class="a-title">Roller bed</span>
+          </figcaption>
+        </figure>
+        <figure class="asset">
+          <img src="media/assets/chain-transfer.jpg" alt="Chain transfer unit">
+          <figcaption>
+            <span class="a-stage">Stage 05</span><span class="a-title">Chain transfer</span>
+          </figcaption>
+        </figure>
+      </div>
+      <dl class="spec">
+        <div><dt>Threshold</dt><dd>50 mm bounding-box diagonal</dd></div>
+        <div><dt>Reduction</dt><dd>10&ndash;100&times;, silhouette held</dd></div>
+        <div><dt>Collision</dt><dd>Primitives, never the render mesh</dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <!-- 04 -->
+  <section class="chapter" data-chapter="Standard">
+    <div class="panel">
+      <p class="num"><s></s>04 <em>/ 06</em> &nbsp;Standard</p>
+      <h2>One material standard, one server, one naming rule</h2>
+      <p class="sig">Why the assets are reusable</p>
+      <p>
+        Every asset exports the same four maps into the same shader slots, lands on
+        Nucleus under the same structure, and is referenced as a payload.
+        <b>Update the source once and every scene using it updates.</b>
+      </p>
+      <div class="asset-pair">
+        <figure class="asset">
+          <img src="media/assets/chain-drive-detail.jpg" alt="Chain drive and guide rail, smart-material textured">
+          <figcaption>
+            <span class="a-stage">Stage 09</span><span class="a-title">Chain drive</span>
+          </figcaption>
+        </figure>
+        <figure class="asset">
+          <img src="media/assets/light-curtain-infeed.jpg" alt="Light-curtain guarded infeed conveyor">
+          <figcaption>
+            <span class="a-stage">Stage 09</span><span class="a-title">Guarded infeed</span>
+          </figcaption>
+        </figure>
+      </div>
+      <dl class="spec">
+        <div><dt>Maps</dt><dd>_BaseColor &middot; _Normal &middot; _ORM &middot; _Emissive</dd></div>
+        <div><dt>Shader</dt><dd>OmniPBR, one bind procedure</dd></div>
+        <div><dt>Storage</dt><dd>Nucleus, payload-referenced</dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <!-- 05 -->
+  <section class="chapter" data-chapter="Sign-off">
+    <div class="panel">
+      <p class="num"><s></s>05 <em>/ 06</em> &nbsp;Sign-off</p>
+      <h2>Sim-ready is a measurement, not an opinion</h2>
+      <p class="sig">Quality gates</p>
+      <p>
+        An asset ships when transforms are zeroed, collision is assigned and it opens
+        clean. A scene ships when it matches the DWG <b>within &plusmn;10 mm</b> and
+        opens in under thirty seconds. Nothing passes on impression.
+      </p>
+      <div class="asset-pair">
+        <figure class="asset">
+          <img src="media/assets/guarded-cell.jpg" alt="Guarded conveyor cell with safety fencing">
+          <figcaption>
+            <span class="a-stage">Stage 12</span><span class="a-title">Guarded cell</span>
+          </figcaption>
+        </figure>
+        <figure class="asset">
+          <img src="media/assets/roller-plan.jpg" alt="Roller bed, plan view showing origin placement">
+          <figcaption>
+            <span class="a-stage">Stage 06</span><span class="a-title">Origin check</span>
+          </figcaption>
+        </figure>
+      </div>
+      <dl class="spec">
+        <div><dt>Per asset</dt><dd>8 checks before handover</dd></div>
+        <div><dt>Placement</dt><dd>&plusmn;10 mm against the DWG</dd></div>
+        <div><dt>Scene open</dt><dd>Under 30 seconds</dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <!-- 06 -->
+  <section class="chapter" data-chapter="Outcome">
+    <div class="panel">
+      <p class="num"><s></s>06 <em>/ 06</em> &nbsp;Outcome</p>
+      <h2>The real deliverable was the document</h2>
+      <p class="sig">What it changed</p>
+      <p>
+        The pipeline ships as a controlled SOP — scripts, checklists, a new-joiner
+        path. That is what turned a process living in one head into something
+        <b>a team of four runs, and a new designer picks up in a day.</b>
+      </p>
+      <div class="asset-pair">
+        <figure class="asset">
+          <img src="media/assets/conveyor-walkway.jpg" alt="Conveyor with access walkway and handrails">
+          <figcaption>
+            <span class="a-stage">Stage 13</span><span class="a-title">Access walkway</span>
+          </figcaption>
+        </figure>
+        <figure class="asset">
+          <img src="media/assets/lift-gantry.jpg" alt="Lift and transfer station">
+          <figcaption>
+            <span class="a-stage">Stage 12</span><span class="a-title">Lift station</span>
+          </figcaption>
+        </figure>
+      </div>
+      <dl class="spec">
+        <div><dt>Document</dt><dd>SOP v1.0, 30 pages, versioned</dd></div>
+        <div><dt>Team</dt><dd>4 designers</dd></div>
+        <div><dt>Onboarding</dt><dd>1 day, previously a week</dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <!-- OUTRO -->
+  <section class="outro" data-chapter="Closing">
+    <blockquote>
+      Never skip a stage. Each one exists because we hit a bug that
+      <span>made us add it.</span>
+    </blockquote>
+    <cite>&mdash; Digital Twin Design Pipeline, v1.0</cite>
+    <div class="stats">
+      <div><strong>CAD</strong><span>In</span></div>
+      <div><strong>USD</strong><span>Out</span></div>
+      <div><strong>13</strong><span>Stages</span></div>
+      <div><strong>1</strong><span>Standard</span></div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="foot-grid">
+    <div>
+      <h6>The thirteen stages</h6>
+      <ul>
+        <li>01 CAD handover</li>
+        <li>02 Unique asset segregation</li>
+        <li>03 CAD to USD conversion</li>
+        <li>04 Blender cleanup</li>
+        <li>05 Retopology and rebuild</li>
+        <li>06 Transforms and origins</li>
+        <li>07 UV unwrapping</li>
+      </ul>
+    </div>
+    <div>
+      <h6>&nbsp;</h6>
+      <ul>
+        <li>08 Export to Painter</li>
+        <li>09 Texturing and ORM</li>
+        <li>10 Nucleus deployment</li>
+        <li>11 OmniPBR materials</li>
+        <li>12 Physics and kinematics</li>
+        <li>13 Scene assembly</li>
+      </ul>
+    </div>
+    <div>
+      <h6>Stack</h6>
+      <ul>
+        <li>NVIDIA Isaac Sim</li>
+        <li>Blender 4.x</li>
+        <li>Substance 3D Painter</li>
+        <li>Omniverse Nucleus</li>
+        <li>DWG TrueView</li>
+      </ul>
+    </div>
+    <div>
+      <h6>Assets shown</h6>
+      <ul>
+        <li>Pallet racking &amp; ASRS</li>
+        <li>Conveyor &amp; sortation</li>
+        <li>Palletiser cells</li>
+        <li>Guarding &amp; safety fencing</li>
+        <li>Dock &amp; yard</li>
+      </ul>
+    </div>
+  </div>
+  <div class="colophon">
+    <span>Sim Ready &mdash; Digital Twin Asset Creation</span>
+    <div class="colophon-end">
+      <span>by Shamil Rahman</span>
+      <a class="colophon-cta" href="https://www.linkedin.com/in/shamil-rahman-628a2b1b9/" target="_blank" rel="noopener noreferrer">Let&rsquo;s talk &rarr;</a>
+    </div>
+  </div>
+</footer>
+
+<script src="media/logo-turn.js"></script>
+<script>
+/* ====================================================================
+   LOADER
+   The quarter-turn mark — logo-turn.js, mounted on the loader canvas and
+   left to run its own 5s loop while the film buffers. Progress is read
+   off the video's buffered ranges and driven by a timer rather than rAF,
+   so a throttled frame loop can never strand the page behind the overlay.
+   ==================================================================== */
+(function(){
+  "use strict";
+
+  var loader = document.getElementById('loader');
+  if (!loader) return;
+
+  var cv    = document.getElementById('logoCv');
+  var bar   = document.getElementById('lBar');
+  var pctEl = document.getElementById('lPct');
+  var stEl  = document.getElementById('lState');
+  var film  = document.getElementById('film');
+
+  document.body.classList.add('loading');
+
+  // 'chalk' is the library's own palette for dark grounds — near-white tiles
+  var turn = null;
+  try {
+    if (cv && window.LogoTurn){
+      turn = window.LogoTurn.mount(cv, { theme: 'chalk', duration: 5000 });
+    }
+  } catch(e){}
+
+  // the same mark in the banner, at icon size — mounted once and left running
+  try {
+    var mk = document.getElementById('markCv');
+    if (mk && window.LogoTurn){
+      window.LogoTurn.mount(mk, { theme: 'chalk', duration: 5000, guide: false });
+    }
+  } catch(e){}
+
+  var MIN = 1600, MAX = 10000, t0 = Date.now();
+  var ready = false, p = 0, done = false, timer = null;
+
+  if (film){
+    film.addEventListener('canplaythrough', function(){ ready = true; });
+    film.addEventListener('error', function(){ ready = true; });
+  }
+
+  function buffered(){
+    try{
+      if (film && film.buffered && film.buffered.length && film.duration){
+        // only the opening has to be there before the page may start
+        return Math.min(1, film.buffered.end(0) / Math.min(12, film.duration));
+      }
+    }catch(e){}
+    return 0;
+  }
+
+  function finish(){
+    if (done) return;
+    done = true;
+    if (timer) clearInterval(timer);
+    if (turn && turn.stop){ try { turn.stop(); } catch(e){} }
+    loader.classList.add('done');
+    document.body.classList.remove('loading');
+    setTimeout(function(){
+      if (loader.parentNode) loader.parentNode.removeChild(loader);
+    }, 900);
+  }
+
+  // failsafe: the page must never stay stuck behind the overlay
+  setTimeout(finish, MAX + 2000);
+
+  timer = setInterval(function(){
+    var el = Date.now() - t0;
+    var target = ready ? 1 : Math.min(0.94, Math.max(buffered() * 0.9, el / MAX));
+    if (el < MIN) target = Math.min(target, el / MIN);   // never outrun the loop
+    if (el > MAX) target = 1;
+    p += (target - p) * 0.18;
+    if (p > 0.995) p = 1;
+
+    bar.style.width = (p * 100).toFixed(1) + '%';
+    pctEl.textContent = Math.round(p * 100) + '%';
+    stEl.textContent = p < 0.35 ? 'Loading' : p < 0.8 ? 'Buffering' : p < 1 ? 'Almost' : 'Ready';
+
+    if (p >= 1 && (ready || el > MAX)) setTimeout(finish, 420);
+  }, 50);
+})();
+</script>
+
+<script>
+(function(){
+  "use strict";
+
+  var film     = document.getElementById('film');
+  var railEl   = document.getElementById('rail');
+  var scrubBar = document.getElementById('scrubBar');
+  var cNum     = document.getElementById('cNum');
+  var cName    = document.getElementById('cName');
+  var sections = Array.prototype.slice.call(document.querySelectorAll('[data-chapter]'));
+  var reduced  = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---------- chapter rail ---------- */
+  var buttons = sections.map(function(sec){
+    var b = document.createElement('button');
+    b.innerHTML = '<span>' + sec.dataset.chapter + '</span><i></i>';
+    b.addEventListener('click', function(){
+      window.scrollTo({ top: sec.offsetTop + 1, behavior: 'smooth' });
+    });
+    railEl.appendChild(b);
+    return b;
+  });
+
+  var duration = 0, targetTime = 0, easedTime = 0, progress = 0;
+  var activeIdx = -1;
+
+  film.addEventListener('loadedmetadata', function(){
+    duration = film.duration || 0;
+    try { film.currentTime = 0.001; } catch(e){}
+  });
+
+  function readScroll(){
+    var max = document.documentElement.scrollHeight - window.innerHeight;
+    progress = max > 0 ? Math.min(1, Math.max(0, window.scrollY / max)) : 0;
+    scrubBar.style.width = (progress * 100).toFixed(2) + '%';
+  }
+
+  /* ---------- section fade + active chapter ---------- */
+  function paintSections(){
+    var vh = window.innerHeight, newIdx = 0;
+
+    for (var i = 0; i < sections.length; i++){
+      var sec   = sections[i];
+      var panel = sec.querySelector('.panel');
+      var r     = sec.getBoundingClientRect();
+      var centre = (r.top + r.height / 2 - vh / 2) / vh;
+
+      if (r.top < vh * 0.5 && r.bottom > vh * 0.5) newIdx = i;
+
+      if (panel && !reduced){
+        var o = 1 - Math.max(0, (Math.abs(centre) - 0.30) / 0.62);
+        o = Math.min(1, Math.max(0, o));
+        panel.style.opacity   = o.toFixed(3);
+        panel.style.transform = 'translateY(' + (centre * 44).toFixed(1) + 'px)';
+      }
+    }
+
+    if (newIdx !== activeIdx){
+      activeIdx = newIdx;
+      var sec = sections[activeIdx];
+      buttons.forEach(function(b, i){ b.classList.toggle('on', i === activeIdx); });
+
+      var last = sections.length - 1;
+      cNum.textContent  = (activeIdx === last)
+        ? '——'
+        : String(activeIdx).padStart(2,'0') + ' / 06';
+      cName.textContent = sec.dataset.chapter;
+    }
+  }
+
+  function tick(){
+    readScroll();
+    paintSections();
+
+    if (duration){
+      targetTime = progress * duration;
+      easedTime += (targetTime - easedTime) * 0.14;
+      if (!film.seeking && Math.abs(film.currentTime - easedTime) > 0.016){
+        try { film.currentTime = easedTime; } catch(e){}
+      }
+    }
+    requestAnimationFrame(tick);
+  }
+
+  if (reduced){
+    film.loop = true;
+    film.play().catch(function(){});
+    var repaint = function(){ readScroll(); paintSections(); };
+    repaint();
+    window.addEventListener('scroll', repaint, {passive:true});
+  } else {
+    requestAnimationFrame(tick);
+  }
+
+  if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+})();
+</script>
+</body>
+</html>
