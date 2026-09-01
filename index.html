@@ -699,6 +699,19 @@ html.sr-mobile footer {
   html.sr-mobile .scrub { top: auto; bottom: 0; }
 }
 
+/* ── the sheet over the video ───────────────────────────────────────────
+   `.band` is the caption column on a desktop. The page's own mobile rules set
+   `--band: 100%`, which turned it into an 85%-black sheet across the entire
+   screen at z-index 2 — above the video, below everything else. That was right
+   when the copy scrolled over the picture and needed a ground; now that the
+   copy has its own half it is just a filter over the work. Gone.
+
+   The banner sat on that sheet, so its own 85% fill compounded to about 98%.
+   Losing the sheet would have made the header translucent over the video, and
+   the header is not up for redesign — so it takes the solid fill directly. */
+html.sr-mobile .band { display: none !important; }
+html.sr-mobile .banner { background: var(--ink); }
+
 </style>
 </head>
 <body>
