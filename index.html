@@ -491,6 +491,215 @@ body.loading{ overflow:hidden; }
 }
 .colophon-cta:hover{ color:var(--vermilion-l); border-color:var(--vermilion-l); }
 </style>
+<style>
+/* SIM READY — MOBILE. Injected into <head> at publish time, after the page's
+   own styles, so these win without !important except where the desktop rule is
+   itself important.
+
+   The screen halves: video above, chapters below, travelling sideways. See
+   sim-mobile.js for why. */
+
+/* ── the video keeps the top half, uncovered ───────────────────────────── */
+html.sr-mobile .stage {
+  bottom: 50%;
+  border-bottom: 1px solid rgba(212, 206, 195, 0.10);
+}
+
+/* The strip. Fixed, so it does not scroll with the document — its X is a
+   function of the document's scroll instead, which is what keeps it locked to
+   the video. `pointer-events:none` because nothing in it is operable; the
+   contact link in the footer is outside the strip. */
+html.sr-mobile #srTrack {
+  position: fixed;
+  left: 0; right: auto;
+  top: 50%;
+  height: 50%;
+  width: 100vw;
+  overflow: hidden;
+  z-index: 20;
+  pointer-events: none;
+  background: var(--ink);
+}
+/* The reel is what moves. Keeping the clip on the parent means a slide on its
+   way out is cut at the strip's edge instead of sliding over the video. */
+html.sr-mobile #srReel {
+  display: flex;
+  flex-wrap: nowrap;
+  height: 100%;
+  will-change: transform;
+}
+
+html.sr-mobile .sr-slide {
+  flex: 0 0 100vw;
+  width: 100vw;
+  height: 100%;
+  padding: 14px clamp(16px, 5vw, 26px) 22px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* ── the panel, compacted for half a phone ─────────────────────────────── */
+html.sr-mobile .sr-slide .panel { max-width: none; }
+
+html.sr-mobile .sr-slide .num {
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  margin-bottom: 6px;
+}
+html.sr-mobile .sr-slide h1 {
+  font-size: clamp(20px, 6vw, 27px);
+  line-height: 1.1;
+  margin-bottom: 8px;
+}
+html.sr-mobile .sr-slide h2 {
+  font-size: clamp(17px, 5vw, 22px);
+  line-height: 1.15;
+  margin-bottom: 6px;
+}
+html.sr-mobile .sr-slide .sig {
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+}
+html.sr-mobile .sr-slide p,
+html.sr-mobile .sr-slide .lede {
+  font-size: 12.5px;
+  line-height: 1.45;
+  margin-bottom: 8px;
+}
+html.sr-mobile .sr-slide .spec { margin-top: 10px; }
+html.sr-mobile .sr-slide .spec div { padding: 3px 0; }
+html.sr-mobile .sr-slide blockquote {
+  font-size: clamp(16px, 4.6vw, 20px);
+  line-height: 1.25;
+}
+
+/* THE INLINE RENDERS COME OUT OF THE STRIP.
+   Each chapter carries one or two asset figures. In half a phone they take the
+   whole slide and push the argument off it — and they are the least lossy thing
+   to drop, because the video above is those same assets, moving. */
+html.sr-mobile .sr-slide .asset,
+html.sr-mobile .sr-slide .asset-pair { display: none !important; }
+
+/* ── the sections stay, emptied, as the document's height ──────────────── */
+html.sr-mobile section.hero,
+html.sr-mobile section.outro { min-height: 106vh; }
+html.sr-mobile section.chapter { min-height: 106vh; padding: 0; }
+
+/* The scrub bar sits on the seam between the halves rather than at the very
+   bottom edge, where the phone's own gesture bar competes with it. */
+html.sr-mobile .scrub {
+  bottom: auto;
+  top: calc(50% - 2px);
+  z-index: 21;
+}
+
+/* ── the hero, the one slide with more in it than a chapter ─────────────
+   It carries an eyebrow, a two-line headline, a four-line lede, four stats and
+   the scroll cue — 392px of content into a 337px box when measured. Everything
+   below is that 55px, taken off the furniture rather than the argument. */
+html.sr-mobile .sr-slide .eyebrow {
+  font-size: 8.5px;
+  letter-spacing: 0.16em;
+  margin-bottom: 7px;
+}
+html.sr-mobile .sr-slide .lede {
+  font-size: 12px;
+  line-height: 1.42;
+  margin-bottom: 0;
+}
+
+html.sr-mobile .sr-slide .stats {
+  grid-template-columns: 1fr 1fr;
+  gap: 7px 14px;
+  margin-top: 11px;
+  padding-top: 10px;
+}
+html.sr-mobile .sr-slide .stats div { padding: 0; }
+html.sr-mobile .sr-slide .stats strong {
+  font-size: 16px;
+  line-height: 1.1;
+  margin-bottom: 1px;
+}
+html.sr-mobile .sr-slide .stats span {
+  font-size: 8px;
+  letter-spacing: 0.11em;
+  line-height: 1.25;
+}
+
+/* The cue stays IN FLOW. Floating it over the slide put "Scroll" straight
+   through the "1 day" stat — and the desktop rule is margin-top:auto, which in
+   this column would shove it to the floor and break the centring, so both the
+   auto margin and the 2.2rem foot are replaced outright.
+   Laid flat, too: a 30px vertical stroke costs a tenth of the room a chapter
+   has for its whole argument. */
+html.sr-mobile .sr-slide .enter {
+  margin: 11px 0 0;
+  padding: 0;
+  gap: 0.5rem;
+  align-items: center;
+}
+html.sr-mobile .sr-slide .enter i {
+  width: 22px;
+  height: 1px;
+  background: linear-gradient(to right, var(--vermilion), transparent);
+  animation: sr-cue 2.2s ease-in-out infinite;
+}
+html.sr-mobile .sr-slide .enter span { font-size: 8.5px; letter-spacing: 0.2em; }
+@keyframes sr-cue {
+  0%, 100% { transform: scaleX(0.35); transform-origin: left; opacity: 0.4; }
+  50%      { transform: scaleX(1);    transform-origin: left; opacity: 1; }
+}
+
+/* ── the outro ─────────────────────────────────────────────────────────── */
+html.sr-mobile .sr-slide cite { font-size: 9.5px; letter-spacing: 0.12em; }
+
+/* ── the footer has to be able to arrive ────────────────────────────────
+   Both halves of the screen are `position: fixed`, so everything still in flow
+   sits behind them — including the footer, and with it the only contact link on
+   the page. Lifting it above the strip (but below the banner at 50) lets it
+   ride up over the pinned halves at the end of the scroll, which is also the
+   right ending: the piece finishes and the colophon covers it.
+   Its desktop background fades in from transparent over the top 30%, which here
+   would show the strip through; on a phone it is solid from the first pixel. */
+html.sr-mobile footer {
+  z-index: 30;
+  background: var(--ink);
+  padding-top: 3.4rem;
+  border-top: 1px solid rgba(212, 206, 195, 0.10);
+}
+
+/* ── held sideways ──────────────────────────────────────────────────────
+   A phone in landscape is inside the 900px gate but only ~390px tall, so
+   halving it top-to-bottom leaves 195px — less than any chapter needs. Split
+   it the other way instead: video left, chapters travelling across the right.
+   The strip is the same strip; only the slide width changes, and sim-mobile.js
+   measures its travel in slide widths for exactly this reason. */
+@media (orientation: landscape) {
+  html.sr-mobile .stage {
+    bottom: 0;
+    right: 50%;
+    border-bottom: 0;
+    border-right: 1px solid rgba(212, 206, 195, 0.10);
+  }
+  html.sr-mobile #srTrack {
+    top: 0;
+    left: 50%;
+    height: 100%;
+    width: 50vw;
+  }
+  html.sr-mobile .sr-slide {
+    flex: 0 0 50vw;
+    width: 50vw;
+    padding: 12px clamp(14px, 3vw, 22px);
+  }
+  html.sr-mobile .scrub { top: auto; bottom: 0; }
+}
+
+</style>
 </head>
 <body>
 
@@ -946,6 +1155,12 @@ body.loading{ overflow:hidden; }
       }
     }
 
+    /* Past the final section nothing covers the mid-line and newIdx would
+       fall back to 0, announcing chapter 00 over the footer. Hold the last. */
+    var lastSec = sections[sections.length - 1];
+    if (newIdx === 0 && lastSec.getBoundingClientRect().bottom <= vh * 0.5)
+      newIdx = sections.length - 1;
+
     if (newIdx !== activeIdx){
       activeIdx = newIdx;
       var sec = sections[activeIdx];
@@ -985,6 +1200,176 @@ body.loading{ overflow:hidden; }
 
   if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
 })();
+</script>
+<script>
+/* SIM READY — MOBILE: the page turns sideways below the fold.
+ *
+ * On a desktop the chapters scroll up over a full-bleed video. On a phone that
+ * puts type on top of the picture for the whole piece: the video is the work,
+ * and reading over it costs both.
+ *
+ * So on a phone the screen halves. The video keeps the top half, uncovered. The
+ * chapters become slides in a fixed strip across the bottom half and travel
+ * right-to-left as the reader scrolls. One gesture still drives everything —
+ * the document scrolls exactly as it did, the video scrubs off `scrollY` exactly
+ * as it did, and this only reads that same position and turns it into an X
+ * offset. Nothing new decides when anything moves.
+ *
+ * THE SECTIONS STAY IN THE DOCUMENT. Their contents are MOVED into the strip,
+ * not cloned, but the sections themselves remain in flow keeping their
+ * `min-height` — which is what the page's scroll length, and therefore the
+ * video's scrub, is made of. Emptying them without that would collapse the
+ * document and take the video with it.
+ */
+(function () {
+  'use strict';
+
+  var MOBILE_MAX = 900;
+  if ((window.innerWidth || 0) > MOBILE_MAX) return;
+
+  /* On the element, before <body> is parsed, so the critical rules that halve
+     the screen are in force from the first paint rather than after a reflow. */
+  document.documentElement.classList.add('sr-mobile');
+
+  /* How much of a section's scroll window the slide spends parked before it
+     starts leaving. A slide that drifts the whole way is a smear; one that
+     holds and then travels is a deck, which is what "slide" means and what the
+     video's own chapter timing is cut to. */
+  var HOLD = 0.55;
+
+  /* Portrait splits the screen top/bottom and a slide is a full viewport wide.
+     Landscape splits it left/right — half of a phone held sideways is about
+     195px tall, which no chapter fits into — and a slide is then half as wide.
+     The travel is measured in slide widths, so the unit has to follow. */
+  var land = window.matchMedia('(orientation: landscape)');
+  function slideVw() { return land.matches ? 50 : 100; }
+
+  function build() {
+    var secs = [].slice.call(document.querySelectorAll('[data-chapter]'));
+    if (secs.length < 2) return;
+
+    /* Two elements, not one. `overflow:hidden` on the element that also carries
+       the transform is useless — the clip travels with it — and in landscape,
+       where the strip is only half the screen wide, that let the outgoing slide
+       ride over the video. So the outer one is the window and stays put; the
+       inner one is the reel and moves. */
+    var track = document.createElement('div');
+    track.id = 'srTrack';
+    var reel = document.createElement('div');
+    reel.id = 'srReel';
+    track.appendChild(reel);
+
+    secs.forEach(function (s, i) {
+      var slide = document.createElement('div');
+      slide.className = 'sr-slide';
+      slide.setAttribute('data-i', String(i));
+      /* Everything, not just `.panel` — the hero and the outro carry their
+         content as direct children and have no panel to look for. */
+      while (s.firstChild) slide.appendChild(s.firstChild);
+      reel.appendChild(slide);
+    });
+    document.body.appendChild(track);
+
+    /* The page's own driver fades and lifts each `.panel` by writing inline
+       styles from its rAF loop. It looks them up with sec.querySelector, so
+       once a panel is out of its section the driver stops touching it — but a
+       tick may have landed before this ran and left an opacity behind, which
+       would strand that slide invisible for good. Clear what it wrote. */
+    [].forEach.call(track.querySelectorAll('.panel'), function (p) {
+      p.style.opacity = '';
+      p.style.transform = '';
+    });
+
+    var n = secs.length;
+    var slides = [].slice.call(reel.children);
+    var foot = document.querySelector('footer');
+    var A = [];          /* the scroll at which each section becomes active */
+    var raf = 0, lastX = null;
+
+    /* The page's header counter calls a section active when its box covers the
+       viewport's mid-line. Deriving the strip's position from that same rule —
+       rather than from a flat 0..1 across the document — is what keeps the
+       slide, the header's number and the video's chapter showing the same
+       thing. A linear map drifts: it put chapter 03 under a header reading 04. */
+    function measure() {
+      var vh = window.innerHeight;
+      A.length = 0;
+      for (var i = 0; i < n; i++) A.push(secs[i].offsetTop - vh * 0.5);
+      lastX = null;
+    }
+
+    function smooth(t) { return t * t * (3 - 2 * t); }
+
+    function place() {
+      raf = 0;
+      if (!A.length) return;
+      var y = window.scrollY;
+
+      var i = 0;
+      while (i < n - 1 && y >= A[i + 1]) i++;
+
+      var e = 0;
+      if (i < n - 1) {
+        var span = A[i + 1] - A[i];
+        var u = span > 0 ? (y - A[i]) / span : 0;
+        u = u < 0 ? 0 : u > 1 ? 1 : u;
+        e = u <= HOLD ? 0 : smooth((u - HOLD) / (1 - HOLD));
+      }
+
+      var pos = i + e;
+
+      /* The footer rides up over both pinned halves at the end of the scroll.
+         Left alone it saws through the outro's sentence on its way past, which
+         reads as a bug rather than an ending — so the strip clears as the
+         footer's edge reaches the seam, and the footer arrives over an empty
+         lower half. */
+      if (foot) {
+        var ft = foot.getBoundingClientRect().top;
+        var vh = window.innerHeight, half = vh * 0.5;
+        var fade = ft >= vh ? 1 : ft <= half ? 0 : (ft - half) / half;
+        track.style.opacity = fade.toFixed(3);
+        track.style.visibility = fade < 0.01 ? 'hidden' : '';
+      }
+
+      var x = -pos * slideVw();
+      if (lastX !== null && Math.abs(x - lastX) < 0.01) return;
+      lastX = x;
+      reel.style.transform = 'translate3d(' + x.toFixed(3) + 'vw,0,0)';
+
+      /* Two slides are on screen mid-travel. Fading whichever is off-centre
+         makes that read as one slide replacing another rather than as a
+         filmstrip being dragged past. */
+      for (var j = 0; j < n; j++) {
+        var d = Math.abs(j - pos);
+        if (d > 1.05) { if (slides[j].style.opacity !== '0') slides[j].style.opacity = '0'; continue; }
+        slides[j].style.opacity = (1 - Math.min(1, d) * 0.72).toFixed(3);
+      }
+    }
+
+    function remeasure() { measure(); place(); }
+
+    measure();
+    place();
+
+    window.addEventListener('scroll', function () {
+      if (!raf) raf = requestAnimationFrame(place);
+    }, { passive: true });
+    window.addEventListener('resize', remeasure);
+    window.addEventListener('load', remeasure);
+    /* Rotating changes both the slide width and the section heights. */
+    if (land.addEventListener) land.addEventListener('change', remeasure);
+    else if (land.addListener) land.addListener(remeasure);
+    /* Web fonts and the poster frame land after DOMContentLoaded and change the
+       sections' offsets; re-read rather than trust the first measurement. */
+    setTimeout(remeasure, 400);
+    setTimeout(remeasure, 1600);
+  }
+
+  if (document.readyState === 'loading')
+    document.addEventListener('DOMContentLoaded', build);
+  else build();
+}());
+
 </script>
 </body>
 </html>
